@@ -311,6 +311,92 @@ def render_query_report(
     return md, write_report(query_id, md)
 
 
+def render_optimize_report_md(output) -> str:
+    """Render the edit-loop report (§6.5 output): outcome, score trajectory,
+    compliance-gate log, recommended passage, and diff against the original."""
+    q = output.query
+    lines: list[str] = []
+    lines.append(f"# Citeworthy — Optimize: {q.text}")
+    lines.append("")
+    lines.append(f"`{q.id}` · tier **{q.tier}** · run `{output.run_id[:8]}`")
+    lines.append("")
+
+    # Outcome.
+    lines.append("## Outcome")
+    lines.append("")
+    if output.accepted:
+        last = next((it for it in reversed(output.iterations) if it.accepted), None)
+        label = last.best_label if last else "?"
+        lines.append(f"- **Accepted a variant** targeting `{label}`.")
+        if last:
+            lines.append(f"- Selection prob: {_pct(last.original_prob)} → "
+                         f"**{_pct(last.best_prob)}** (non-overlapping CIs).")
+    else:
+        lines.append("- **No significant improvement** — kept the original passage. "
+                     "(A valid, expected outcome — §6.5.)")
+    lines.append("")
+
+    # Score trajectory.
+    lines.append("## Score trajectory")
+    lines.append("")
+    lines.append("| Iter | Variants | Passed gate | Failed gate | Best variant | Best prob | Original prob | Accepted |")
+    lines.append("|-----:|---------:|------------:|------------:|--------------|----------:|--------------:|:--------:|")
+    for it in output.iterations:
+        best = it.best_label or "—"
+        bp = _pct(it.best_prob) if it.variants_passed else "—"
+        op = _pct(it.original_prob) if it.variants_passed else "—"
+        acc = "✓" if it.accepted else ""
+        lines.append(
+            f"| {it.index} | {it.variants_generated} | {it.variants_passed} | "
+            f"{len(it.failed)} | {best} | {bp} | {op} | {acc} |"
+        )
+    lines.append("")
+
+    # Compliance gate — failures must be visible, none bypass the gate (v2 accept).
+    lines.append("## Compliance gate")
+    lines.append("")
+    failed = output.failed_variants
+    if not failed:
+        lines.append("Every generated variant passed the compliance gate.")
+    else:
+        lines.append(f"**{len(failed)}** variant(s) were **discarded** by the gate "
+                     "(logged, never entered the tournament):")
+        for f in failed:
+            lines.append(f"- `{f.label}`: {'; '.join(f.violations)}")
+    lines.append("")
+
+    # Recommended passage + diff.
+    lines.append("## Recommended passage")
+    lines.append("")
+    if output.accepted:
+        lines.append(f"_Rewritten (targeting `{output.final.variant_label}`):_")
+    else:
+        lines.append("_Unchanged from the original:_")
+    lines.append("")
+    lines.append("> " + output.final.text.replace("\n", "\n> "))
+    lines.append("")
+
+    if output.diff:
+        lines.append("## Diff vs original")
+        lines.append("")
+        lines.append("```diff")
+        lines.append(output.diff)
+        lines.append("```")
+        lines.append("")
+
+    lines.append("---")
+    lines.append(f"*Editor + judge spend: ${output.total_cost_usd:.4f}.*")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_optimize_report(query_id: str, markdown: str) -> Path:
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = REPORTS_DIR / f"{query_id}-optimize.md"
+    path.write_text(markdown, encoding="utf-8")
+    return path
+
+
 def render_portfolio_report() -> str:
     """The `--all` portfolio summary (§6.7) — implemented in Milestone 7."""
     raise NotImplementedError("Portfolio report lands with Milestone 7.")

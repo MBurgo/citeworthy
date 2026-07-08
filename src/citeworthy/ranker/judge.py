@@ -81,10 +81,18 @@ class TransportResponse:
 class JudgeTransport(Protocol):
     """Anything that can turn a (system, user) prompt into a TransportResponse.
 
-    Production wraps the Anthropic SDK; tests inject canned responses."""
+    Production wraps the Anthropic SDK; tests inject canned responses. The editor
+    (Milestone 6) reuses this transport with temperature=None (omitted), so it
+    works on models that reject sampling params."""
 
     def complete(
-        self, *, system: str, user: str, model: str, temperature: float, max_tokens: int
+        self,
+        *,
+        system: str,
+        user: str,
+        model: str,
+        temperature: float | None,
+        max_tokens: int,
     ) -> TransportResponse: ...
 
 
@@ -196,15 +204,23 @@ class AnthropicTransport:
             self._client = anthropic.Anthropic(api_key=api_key, max_retries=max_retries)
 
     def complete(
-        self, *, system: str, user: str, model: str, temperature: float, max_tokens: int
+        self,
+        *,
+        system: str,
+        user: str,
+        model: str,
+        temperature: float | None = None,
+        max_tokens: int,
     ) -> TransportResponse:
-        msg = self._client.messages.create(
+        kwargs = dict(
             model=model,
             max_tokens=max_tokens,
-            temperature=temperature,
             system=system,
             messages=[{"role": "user", "content": user}],
         )
+        if temperature is not None:  # omit for models that reject sampling params
+            kwargs["temperature"] = temperature
+        msg = self._client.messages.create(**kwargs)
         text = "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
         return TransportResponse(
             text=text,

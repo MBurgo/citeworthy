@@ -19,13 +19,13 @@ Built per the milestone sequence in §14 of CITEWORTHY_SPEC.md.
 - [x] Milestone 3: Judge client + tournament + Bradley–Terry + bootstrap.
 - [x] Milestone 4: `rank` end-to-end + report. **Human review checkpoint (awaiting a real run).**
 - [x] Milestone 5: Tracker (`truth/` + `track run` + share stats).
-- [ ] Milestone 6: Edit loop + compliance gate.
+- [x] Milestone 6: Edit loop + compliance gate.
 - [ ] Milestone 7: Portfolio report + judge-vs-reality correlation.
 
-Modules under editor/ are scaffolded stubs — they define the interfaces but
-raise NotImplementedError until Milestone 6. serp/serpapi.py and extract.py are
-implemented as of Milestone 2; ranker/judge.py, tournament.py, and
-bradley_terry.py as of Milestone 3; pipeline.py, report.py, ranker/diagnose.py,
-and the `rank`/`report` CLI commands as of Milestone 4; truth/ (perplexity,
-gemini, share), tracker.py, and the `track run` command as of Milestone 5.
-report.py's `--all` portfolio summary lands with Milestone 7.
+serp/serpapi.py and extract.py are implemented as of Milestone 2; ranker/judge.py,
+tournament.py, and bradley_terry.py as of Milestone 3; pipeline.py, report.py,
+ranker/diagnose.py, and the `rank`/`report` CLI commands as of Milestone 4;
+truth/ (perplexity, gemini, share), tracker.py, and the `track run` command as of
+Milestone 5; editor/ (variants, compliance, loop) and the `optimize` command as
+of Milestone 6. Only report.py's `--all` portfolio summary + judge-vs-reality
+correlation remain (Milestone 7).

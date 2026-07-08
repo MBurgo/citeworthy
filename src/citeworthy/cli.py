@@ -302,9 +302,75 @@ def _git_sha() -> str | None:
 @app.command()
 def optimize(
     query_id: str = typer.Argument(..., help="Query slug to optimise."),
+    show: bool = typer.Option(False, "--show", help="Print the optimize report."),
 ) -> None:
     """v2: run the edit loop (hill-climb with a compliance gate) on a ranked query."""
-    _not_yet("optimize", "Milestone 6")
+    import uuid
+    from datetime import datetime, timezone
+
+    from . import report as report_mod
+    from .config import api_key
+    from .editor.compliance import RuleComplianceChecker
+    from .editor.loop import OptimizeError, run_optimize
+    from .models import Run
+    from .ranker.judge import AnthropicTransport, Judge
+    from .ranker.tournament import BudgetExceeded
+
+    config = load_config()
+    conn = db.connect()
+    try:
+        query = db.get_query(conn, query_id)
+        if query is None:
+            console.print(f"[red]No query with id[/red] {query_id}.")
+            raise typer.Exit(code=1)
+
+        anthropic_key = api_key("ANTHROPIC_API_KEY")
+        if not anthropic_key:
+            console.print("[red]ANTHROPIC_API_KEY is not set.[/red]")
+            raise typer.Exit(code=1)
+
+        transport = AnthropicTransport(anthropic_key)
+        judge = Judge(
+            transport, model=config.judge.model,
+            temperature=config.judge.temperature, show_domains=config.judge.show_domains,
+        )
+        checker = RuleComplianceChecker()
+
+        run_id = uuid.uuid4().hex[:12]
+        db.create_run(
+            conn,
+            Run(run_id=run_id, kind="optimize", started_at=datetime.now(timezone.utc),
+                config_hash=config.config_hash(), git_sha=_git_sha()),
+        )
+
+        console.print(f"[bold]Optimising[/bold] {query.id} — “{query.text}”…")
+        try:
+            out = run_optimize(
+                query, config, judge=judge, editor_transport=transport,
+                checker=checker, conn=conn, run_id=run_id,
+                editor_model=config.editor.model,
+            )
+        except OptimizeError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1)
+        except BudgetExceeded as exc:
+            console.print(f"[red]Budget cap hit:[/red] {exc}")
+            raise typer.Exit(code=3)
+
+        path = report_mod.write_optimize_report(query.id, out.report_md)
+        if out.accepted:
+            console.print(f"  [green]Accepted a variant[/green] targeting "
+                          f"`{out.final.variant_label}`.")
+        else:
+            console.print("  [yellow]No significant improvement[/yellow] — kept the original.")
+        n_failed = len(out.failed_variants)
+        if n_failed:
+            console.print(f"  [dim]{n_failed} variant(s) discarded by the compliance gate.[/dim]")
+        console.print(f"  ${out.total_cost_usd:.4f} · [green]Report:[/green] {path}")
+        if show:
+            console.print(out.report_md)
+    finally:
+        conn.close()
 
 
 # --- track (v3) ------------------------------------------------------------
