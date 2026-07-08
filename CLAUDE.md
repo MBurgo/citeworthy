@@ -16,13 +16,14 @@ Internal tool: measures and improves fool.com.au citation share in AI answers.
 Built per the milestone sequence in §14 of CITEWORTHY_SPEC.md.
 - [x] Milestone 1: Scaffold repo, config, models, db, CLI skeleton (all commands stubbed).
 - [x] Milestone 2: Competitive set builder + chunker, with fixtures and tests.
-- [ ] Milestone 3: Judge client + tournament + Bradley–Terry + bootstrap.
+- [x] Milestone 3: Judge client + tournament + Bradley–Terry + bootstrap.
 - [ ] Milestone 4: `rank` end-to-end + report. **Human review checkpoint.**
 - [ ] Milestone 5: Tracker (`truth/` + `track run` + share stats).
 - [ ] Milestone 6: Edit loop + compliance gate.
 - [ ] Milestone 7: Portfolio report + judge-vs-reality correlation.
 
-Modules under ranker/, editor/, truth/, and report.py are scaffolded stubs —
-they define the interfaces but raise NotImplementedError until their milestone
-lands. serp/serpapi.py and extract.py (fetch, extraction, chunker, competitive-
-set builder) are implemented as of Milestone 2.
+Modules under editor/, truth/, ranker/diagnose.py, and report.py are scaffolded
+stubs — they define the interfaces but raise NotImplementedError until their
+milestone lands. serp/serpapi.py and extract.py are implemented as of Milestone
+2; ranker/judge.py, tournament.py, and bradley_terry.py as of Milestone 3.
+Milestone 4 wires these into the `rank` command end-to-end.

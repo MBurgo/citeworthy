@@ -87,6 +87,19 @@ class Config(BaseModel):
         payload = self.model_dump_json().encode("utf-8")
         return hashlib.sha256(payload).hexdigest()[:16]
 
+    def estimate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+        """USD cost estimate for a call, from the editable price table (§8, §11).
+
+        Unknown models cost 0.0 (and should be added to config.yaml:pricing).
+        """
+        price = self.pricing.get(model)
+        if price is None:
+            return 0.0
+        return (
+            input_tokens / 1_000_000 * price.input_per_mtok
+            + output_tokens / 1_000_000 * price.output_per_mtok
+        )
+
 
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     """Load and validate config.yaml. Missing file falls back to model defaults."""
