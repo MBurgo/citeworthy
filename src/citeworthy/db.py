@@ -223,19 +223,150 @@ def cost_summary(conn: sqlite3.Connection) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-# --- Scaffolded persistence (implemented with their milestone) -------------
+# --- Rank persistence (Milestone 4) ----------------------------------------
 
 
 def save_passage(conn: sqlite3.Connection, passage: Passage) -> None:
-    raise NotImplementedError("Passage persistence lands with Milestone 2.")
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO passages
+            (id, url, domain, title, chunk_index, text, is_ours, variant_of, variant_label)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            passage.id,
+            str(passage.url),
+            passage.domain,
+            passage.title,
+            passage.chunk_index,
+            passage.text,
+            int(passage.is_ours),
+            passage.variant_of,
+            passage.variant_label,
+        ),
+    )
+    conn.commit()
 
 
 def save_matchup(conn: sqlite3.Connection, run_id: str, matchup: Matchup) -> None:
-    raise NotImplementedError("Matchup persistence lands with Milestone 3.")
+    conn.execute(
+        """
+        INSERT INTO matchups
+            (run_id, query_id, passage_a, passage_b, winner, reason_code,
+             reason_text, judge_model, position_order, sample_index)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            matchup.query_id,
+            matchup.passage_a,
+            matchup.passage_b,
+            matchup.winner,
+            matchup.reason_code,
+            matchup.reason_text,
+            matchup.judge_model,
+            matchup.position_order,
+            matchup.sample_index,
+        ),
+    )
+    conn.commit()
 
 
 def save_rank_result(conn: sqlite3.Connection, result: RankResult) -> None:
-    raise NotImplementedError("RankResult persistence lands with Milestone 3.")
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO rank_results
+            (run_id, query_id, passage_id, bt_strength, selection_prob, rank, ci_low, ci_high)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            result.run_id,
+            result.query_id,
+            result.passage_id,
+            result.bt_strength,
+            result.selection_prob,
+            result.rank,
+            result.ci_low,
+            result.ci_high,
+        ),
+    )
+    conn.commit()
+
+
+def latest_rank_run_id(conn: sqlite3.Connection, query_id: str) -> str | None:
+    """The run_id of the most recent rank run that produced results for a query."""
+    row = conn.execute(
+        """
+        SELECT rr.run_id
+        FROM rank_results rr
+        JOIN runs r ON rr.run_id = r.run_id
+        WHERE rr.query_id = ?
+        ORDER BY r.started_at DESC
+        LIMIT 1
+        """,
+        (query_id,),
+    ).fetchone()
+    return row["run_id"] if row else None
+
+
+def get_rank_results(
+    conn: sqlite3.Connection, run_id: str, query_id: str
+) -> list[RankResult]:
+    rows = conn.execute(
+        """
+        SELECT run_id, query_id, passage_id, bt_strength, selection_prob, rank, ci_low, ci_high
+        FROM rank_results
+        WHERE run_id = ? AND query_id = ?
+        ORDER BY rank
+        """,
+        (run_id, query_id),
+    ).fetchall()
+    return [RankResult(**dict(r)) for r in rows]
+
+
+def get_matchups(
+    conn: sqlite3.Connection, run_id: str, query_id: str
+) -> list[Matchup]:
+    rows = conn.execute(
+        """
+        SELECT query_id, passage_a, passage_b, winner, reason_code, reason_text,
+               judge_model, position_order, sample_index
+        FROM matchups
+        WHERE run_id = ? AND query_id = ?
+        """,
+        (run_id, query_id),
+    ).fetchall()
+    return [Matchup(**dict(r)) for r in rows]
+
+
+def get_passages(conn: sqlite3.Connection, ids: list[str]) -> dict[str, Passage]:
+    if not ids:
+        return {}
+    placeholders = ",".join("?" * len(ids))
+    rows = conn.execute(
+        f"""
+        SELECT id, url, domain, title, chunk_index, text, is_ours, variant_of, variant_label
+        FROM passages WHERE id IN ({placeholders})
+        """,
+        ids,
+    ).fetchall()
+    result: dict[str, Passage] = {}
+    for r in rows:
+        result[r["id"]] = Passage(
+            id=r["id"],
+            url=r["url"],
+            domain=r["domain"],
+            title=r["title"],
+            chunk_index=r["chunk_index"],
+            text=r["text"],
+            is_ours=bool(r["is_ours"]),
+            variant_of=r["variant_of"],
+            variant_label=r["variant_label"],
+        )
+    return result
+
+
+# --- Tracker persistence (implemented with Milestone 5) --------------------
 
 
 def save_observation(conn: sqlite3.Connection, obs: CitationObservation) -> None:

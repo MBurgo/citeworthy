@@ -159,9 +159,141 @@ def queries_rm(
 def rank(
     query_id: str = typer.Argument(None, help="Query slug (omit with --all)."),
     all: bool = typer.Option(False, "--all", help="Rank every query."),
+    no_robots: bool = typer.Option(
+        False, "--no-robots", help="Skip robots.txt checks (use only on sites you own)."
+    ),
 ) -> None:
     """v1: build the competitive set, run the tournament, and report."""
-    _not_yet("rank", "Milestone 4")
+    import uuid
+    from datetime import datetime, timezone
+
+    import httpx
+
+    from .config import api_key
+    from .extract import DEFAULT_UA
+    from .models import Run
+    from .pipeline import rank_query
+    from .ranker.judge import AnthropicTransport, Judge
+    from .ranker.tournament import BudgetExceeded
+    from .serp.serpapi import SerpApiProvider
+
+    config = load_config()
+
+    conn = db.connect()
+    try:
+        if all:
+            queries = db.list_queries(conn)
+        elif query_id:
+            q = db.get_query(conn, query_id)
+            queries = [q] if q else []
+            if not q:
+                console.print(f"[red]No query with id[/red] {query_id}.")
+                raise typer.Exit(code=1)
+        else:
+            console.print("[red]Provide a query id or --all.[/red]")
+            raise typer.Exit(code=1)
+
+        if not queries:
+            console.print("[yellow]No queries to rank.[/yellow]")
+            raise typer.Exit(code=1)
+
+        anthropic_key = api_key("ANTHROPIC_API_KEY")
+        if not anthropic_key:
+            console.print("[red]ANTHROPIC_API_KEY is not set.[/red] The judge cannot run.")
+            raise typer.Exit(code=1)
+        serp_key = api_key("SERPAPI_API_KEY")
+        if config.serp.provider == "serpapi" and not serp_key:
+            console.print("[red]SERPAPI_API_KEY is not set.[/red] Cannot build the SERP set.")
+            raise typer.Exit(code=1)
+
+        provider = SerpApiProvider(serp_key or "")
+        judge = Judge(
+            AnthropicTransport(anthropic_key),
+            model=config.judge.model,
+            temperature=config.judge.temperature,
+            show_domains=config.judge.show_domains,
+        )
+        client = httpx.Client(
+            timeout=15.0,
+            headers={"User-Agent": DEFAULT_UA},
+            follow_redirects=True,
+        )
+
+        run_id = uuid.uuid4().hex[:12]
+        db.create_run(
+            conn,
+            Run(
+                run_id=run_id,
+                kind="rank",
+                started_at=datetime.now(timezone.utc),
+                config_hash=config.config_hash(),
+                git_sha=_git_sha(),
+            ),
+        )
+
+        try:
+            for q in queries:
+                console.print(f"\n[bold]Ranking[/bold] {q.id} — “{q.text}”…")
+                try:
+                    out = rank_query(
+                        q, config,
+                        provider=provider, judge=judge, client=client,
+                        run_id=run_id, conn=conn, respect_robots=not no_robots,
+                    )
+                except BudgetExceeded as exc:
+                    console.print(f"[red]Budget cap hit:[/red] {exc}")
+                    raise typer.Exit(code=3)
+                _print_rank_summary(out)
+        finally:
+            client.close()
+    finally:
+        conn.close()
+
+
+def _print_rank_summary(out) -> None:
+    """Concise rich terminal summary of a completed rank (§3 reporting)."""
+    cs = out.candidate_set
+    for w in cs.warnings:
+        console.print(f"  [yellow]![/yellow] {w}")
+
+    table = Table(title=f"{out.query.id} — top passages")
+    table.add_column("rank", justify="right")
+    table.add_column("domain")
+    table.add_column("ours", justify="center")
+    table.add_column("sel. prob", justify="right")
+    table.add_column("95% CI", justify="right")
+    by_rank = sorted(out.rank_results, key=lambda r: r.rank)
+    passages = {p.id: p for p in cs.passages}
+    for r in by_rank[:8]:
+        p = passages[r.passage_id]
+        table.add_row(
+            str(r.rank),
+            p.domain,
+            "✓" if p.is_ours else "",
+            f"{r.selection_prob * 100:.1f}%",
+            f"{r.ci_low * 100:.1f}–{r.ci_high * 100:.1f}%",
+        )
+    console.print(table)
+
+    dr = out.tournament.disagreement_rate
+    warn = "  [yellow]⚠ weak judge signal[/yellow]" if out.tournament.weak_signal else ""
+    console.print(
+        f"  {out.tournament.n_calls} judge calls · "
+        f"${out.total_cost_usd:.4f} · disagreement {dr * 100:.0f}%{warn}"
+    )
+    if out.report_path:
+        console.print(f"  [green]Report:[/green] {out.report_path}")
+
+
+def _git_sha() -> str | None:
+    import subprocess
+
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except Exception:  # noqa: BLE001 - git may be absent; run is still valid
+        return None
 
 
 # --- optimize (v2) ---------------------------------------------------------
@@ -195,9 +327,33 @@ def track_run(
 def report(
     query_id: str = typer.Argument(None, help="Query slug (omit with --all)."),
     all: bool = typer.Option(False, "--all", help="Portfolio summary across queries."),
+    show: bool = typer.Option(False, "--show", help="Print the report to the terminal."),
 ) -> None:
-    """Render a markdown report for a query, or a portfolio summary."""
-    _not_yet("report", "Milestone 4")
+    """Render a markdown report for a query's most recent rank run."""
+    from . import report as report_mod
+
+    if all:
+        _not_yet("report --all", "Milestone 7")
+
+    if not query_id:
+        console.print("[red]Provide a query id or --all.[/red]")
+        raise typer.Exit(code=1)
+
+    conn = db.connect()
+    try:
+        try:
+            md, path = report_mod.render_query_report(
+                conn, query_id, our_domain=load_config().our_domain
+            )
+        except KeyError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+
+    console.print(f"[green]Report written:[/green] {path}")
+    if show:
+        console.print(md)
 
 
 # --- costs -----------------------------------------------------------------

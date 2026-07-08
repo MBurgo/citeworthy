@@ -17,13 +17,14 @@ Built per the milestone sequence in §14 of CITEWORTHY_SPEC.md.
 - [x] Milestone 1: Scaffold repo, config, models, db, CLI skeleton (all commands stubbed).
 - [x] Milestone 2: Competitive set builder + chunker, with fixtures and tests.
 - [x] Milestone 3: Judge client + tournament + Bradley–Terry + bootstrap.
-- [ ] Milestone 4: `rank` end-to-end + report. **Human review checkpoint.**
+- [x] Milestone 4: `rank` end-to-end + report. **Human review checkpoint (awaiting a real run).**
 - [ ] Milestone 5: Tracker (`truth/` + `track run` + share stats).
 - [ ] Milestone 6: Edit loop + compliance gate.
 - [ ] Milestone 7: Portfolio report + judge-vs-reality correlation.
 
-Modules under editor/, truth/, ranker/diagnose.py, and report.py are scaffolded
-stubs — they define the interfaces but raise NotImplementedError until their
-milestone lands. serp/serpapi.py and extract.py are implemented as of Milestone
-2; ranker/judge.py, tournament.py, and bradley_terry.py as of Milestone 3.
-Milestone 4 wires these into the `rank` command end-to-end.
+Modules under editor/ and truth/ are scaffolded stubs — they define the
+interfaces but raise NotImplementedError until their milestone lands.
+serp/serpapi.py and extract.py are implemented as of Milestone 2; ranker/judge.py,
+tournament.py, and bradley_terry.py as of Milestone 3; pipeline.py, report.py,
+ranker/diagnose.py, and the `rank`/`report` CLI commands as of Milestone 4.
+report.py's `--all` portfolio summary lands with Milestone 7.
