@@ -366,11 +366,103 @@ def get_passages(conn: sqlite3.Connection, ids: list[str]) -> dict[str, Passage]
     return result
 
 
-# --- Tracker persistence (implemented with Milestone 5) --------------------
+# --- Tracker persistence (Milestone 5) -------------------------------------
 
 
-def save_observation(conn: sqlite3.Connection, obs: CitationObservation) -> None:
-    raise NotImplementedError("Observation persistence lands with Milestone 5.")
+def save_observation(conn: sqlite3.Connection, run_id: str, obs: CitationObservation) -> None:
+    conn.execute(
+        """
+        INSERT INTO observations
+            (run_id, query_id, engine, sample_index, cited_urls, answer_text_hash, observed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            obs.query_id,
+            obs.engine,
+            obs.sample_index,
+            json.dumps(obs.cited_urls),
+            obs.answer_text_hash,
+            obs.observed_at.isoformat(),
+        ),
+    )
+    conn.commit()
+
+
+def _row_to_observation(r: sqlite3.Row) -> tuple[str, CitationObservation]:
+    """Returns (run_id, observation)."""
+    return r["run_id"], CitationObservation(
+        run_id=r["run_id"],
+        query_id=r["query_id"],
+        engine=r["engine"],
+        sample_index=r["sample_index"],
+        cited_urls=json.loads(r["cited_urls"]),
+        answer_text_hash=r["answer_text_hash"],
+        observed_at=datetime.fromisoformat(r["observed_at"]),
+    )
+
+
+def get_observations(
+    conn: sqlite3.Connection,
+    *,
+    query_id: str | None = None,
+    engine: str | None = None,
+    run_id: str | None = None,
+) -> list[CitationObservation]:
+    """Fetch observations (optionally filtered), oldest run first."""
+    clauses, params = [], []
+    if query_id is not None:
+        clauses.append("o.query_id = ?")
+        params.append(query_id)
+    if engine is not None:
+        clauses.append("o.engine = ?")
+        params.append(engine)
+    if run_id is not None:
+        clauses.append("o.run_id = ?")
+        params.append(run_id)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = conn.execute(
+        f"""
+        SELECT o.run_id, o.query_id, o.engine, o.sample_index, o.cited_urls,
+               o.answer_text_hash, o.observed_at
+        FROM observations o
+        JOIN runs r ON o.run_id = r.run_id
+        {where}
+        ORDER BY r.started_at ASC, o.sample_index ASC
+        """,
+        params,
+    ).fetchall()
+    return [_row_to_observation(r)[1] for r in rows]
+
+
+def observations_by_run(
+    conn: sqlite3.Connection, query_id: str, engine: str
+) -> list[list[CitationObservation]]:
+    """Observations for a (query, engine), grouped by run in chronological order
+    — the shape the rolling-window / trend stats expect (§6.6)."""
+    rows = conn.execute(
+        """
+        SELECT o.run_id, o.query_id, o.engine, o.sample_index, o.cited_urls,
+               o.answer_text_hash, o.observed_at, r.started_at
+        FROM observations o
+        JOIN runs r ON o.run_id = r.run_id
+        WHERE o.query_id = ? AND o.engine = ?
+        ORDER BY r.started_at ASC, o.sample_index ASC
+        """,
+        (query_id, engine),
+    ).fetchall()
+    groups: list[list[CitationObservation]] = []
+    order: list[str] = []
+    by_run: dict[str, list[CitationObservation]] = {}
+    for r in rows:
+        run_id, obs = _row_to_observation(r)
+        if run_id not in by_run:
+            by_run[run_id] = []
+            order.append(run_id)
+        by_run[run_id].append(obs)
+    for run_id in order:
+        groups.append(by_run[run_id])
+    return groups
 
 
 def _dump_urls(urls: list[str]) -> str:

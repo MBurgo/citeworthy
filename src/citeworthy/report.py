@@ -110,6 +110,7 @@ def render_query_report_md(
     run_id: str = "",
     our_domain: str = "fool.com.au",
     disagreement_rate: float | None = None,
+    citation_md: str | None = None,
 ) -> str:
     """Render the per-query markdown report from in-memory data (§6.7)."""
     our_ids = {pid for pid, p in passages.items() if p.is_ours}
@@ -205,17 +206,79 @@ def render_query_report_md(
             lines.append(f"- {ACTIONS.get(w.reason_code, ACTIONS['other'])}")
         lines.append("")
 
+    # Citation share (v3) — real once tracker data exists, else a placeholder.
+    if citation_md:
+        lines.append(citation_md.rstrip())
+        lines.append("")
+    else:
+        lines.append("## Citation share (v3)")
+        lines.append("")
+        lines.append("_No tracker data yet — run `citeworthy track run` to start "
+                     "collecting real citation share (Milestone 5)._")
+        lines.append("")
+
     # Footer.
     lines.append("---")
     warn = ""
     if disagreement_rate > 0.30:
         warn = " ⚠️ Above 30% — judge signal is weak; treat this ranking with caution."
-    lines.append(f"*Judge position-swap disagreement: {_pct(disagreement_rate)}.{warn}*")
-    lines.append("")
-    lines.append("*Citation-share trend appears here once v3 tracking data exists "
-                 "(Milestone 5).*")
+    lines.append(f"*Judge position-swap disagreement: {_pct(disagreement_rate)}.*{warn}")
     lines.append("")
     return "\n".join(lines)
+
+
+def build_citation_share_md(
+    conn: sqlite3.Connection, query_id: str, our_domain: str
+) -> str | None:
+    """Build the citation-share section from stored tracker observations (§6.6).
+
+    Uses a 3-run rolling window with Wilson intervals and refuses to claim a
+    trend from too few runs. Returns None if there's no tracker data yet."""
+    from .truth.share import (
+        compute_shares,
+        rolling_window,
+        trend_vs_baseline,
+    )
+
+    engines = ("perplexity", "gemini_grounded")
+    sections: list[str] = []
+    for engine in engines:
+        runs = db.observations_by_run(conn, query_id, engine)
+        if not runs:
+            continue
+        pooled = rolling_window(runs)
+        our = next(
+            (s for s in compute_shares(pooled) if s.domain == our_domain.lower()), None
+        )
+        our_share = our.share if our else 0.0
+        our_lo, our_hi = (our.ci_low, our.ci_high) if our else (0.0, 0.0)
+        trend = trend_vs_baseline(runs, our_domain)
+
+        block = [f"**{engine}** — {len(runs)} run(s), rolling window of "
+                 f"{min(len(runs), 3)}:"]
+        block.append(
+            f"- our share (`{our_domain}`): {_pct(our_share)} "
+            f"(Wilson {_pct(our_lo)}–{_pct(our_hi)})"
+        )
+        if trend.insufficient:
+            block.append("- **Insufficient data** for a trend — need "
+                         "3+ weekly runs before movement is meaningful.")
+        elif trend.changed and trend.baseline and trend.current:
+            direction = "up" if trend.current.share > trend.baseline.share else "down"
+            block.append(f"- **Significant change ({direction})** vs baseline "
+                         f"{_pct(trend.baseline.share)} — Wilson intervals don't overlap.")
+        elif trend.baseline:
+            block.append(f"- No significant change vs baseline "
+                         f"{_pct(trend.baseline.share)} (intervals overlap).")
+
+        top = ", ".join(f"{s.domain} {_pct(s.share)}" for s in compute_shares(pooled)[:3])
+        if top:
+            block.append(f"- dominating: {top}")
+        sections.append("\n".join(block))
+
+    if not sections:
+        return None
+    return "## Citation share (v3)\n\n" + "\n\n".join(sections)
 
 
 def write_report(query_id: str, markdown: str) -> Path:
@@ -239,9 +302,11 @@ def render_query_report(
     rank_results = db.get_rank_results(conn, run_id, query_id)
     matchups = db.get_matchups(conn, run_id, query_id)
     passages = db.get_passages(conn, [r.passage_id for r in rank_results])
+    citation_md = build_citation_share_md(conn, query_id, our_domain)
 
     md = render_query_report_md(
-        query, rank_results, passages, matchups, run_id=run_id, our_domain=our_domain
+        query, rank_results, passages, matchups, run_id=run_id,
+        our_domain=our_domain, citation_md=citation_md,
     )
     return md, write_report(query_id, md)
 

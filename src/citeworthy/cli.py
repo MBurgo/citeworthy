@@ -317,7 +317,104 @@ def track_run(
     ),
 ) -> None:
     """v3: one ground-truth tracking pass (cron target)."""
-    _not_yet("track run", "Milestone 5")
+    import uuid
+    from datetime import datetime, timezone
+
+    from .config import api_key
+    from .models import Run
+    from .tracker import TrackBudgetExceeded, run_track
+    from .truth.gemini import GeminiClient
+    from .truth.perplexity import PerplexityClient
+
+    config = load_config()
+    conn = db.connect()
+    try:
+        queries = db.list_queries(conn)
+        if not queries:
+            console.print("[yellow]No queries to track. Add some with "
+                          "`citeworthy queries add`.[/yellow]")
+            raise typer.Exit(code=1)
+
+        wanted = engine or config.truth.engines
+        clients = []
+        for name in wanted:
+            if name == "perplexity":
+                key = api_key("PERPLEXITY_API_KEY")
+                if not key:
+                    console.print("[yellow]Skipping perplexity: PERPLEXITY_API_KEY not set.[/yellow]")
+                    continue
+                clients.append(PerplexityClient(key, model=config.truth.perplexity_model))
+            elif name == "gemini_grounded":
+                key = api_key("GEMINI_API_KEY")
+                if not key:
+                    console.print("[yellow]Skipping gemini_grounded: GEMINI_API_KEY not set.[/yellow]")
+                    continue
+                clients.append(GeminiClient(key, model=config.truth.gemini_model))
+            else:
+                console.print(f"[yellow]Unknown engine '{name}' — skipping.[/yellow]")
+
+        if not clients:
+            console.print("[red]No engines available (missing API keys).[/red]")
+            raise typer.Exit(code=1)
+
+        run_id = uuid.uuid4().hex[:12]
+        db.create_run(
+            conn,
+            Run(
+                run_id=run_id,
+                kind="track",
+                started_at=datetime.now(timezone.utc),
+                config_hash=config.config_hash(),
+                git_sha=_git_sha(),
+            ),
+        )
+        console.print(
+            f"[bold]Tracking[/bold] {len(queries)} queries × "
+            f"{len(clients)} engine(s) × {config.truth.samples_per_engine} samples…"
+        )
+        try:
+            result = run_track(
+                queries, clients, config, run_id=run_id, conn=conn,
+                budget_cap=config.budget.max_usd_per_track_run,
+            )
+        except TrackBudgetExceeded as exc:
+            console.print(f"[red]Budget cap hit:[/red] {exc}")
+            raise typer.Exit(code=3)
+
+        _print_track_summary(result, config.our_domain)
+    finally:
+        conn.close()
+
+
+def _print_track_summary(result, our_domain: str) -> None:
+    """Per-run citation-share summary (a single run is noise — §6.6)."""
+    for w in result.warnings:
+        console.print(f"  [yellow]{w}[/yellow]")
+
+    for s in result.stats:
+        if s.n_samples == 0:
+            console.print(f"[dim]{s.query_id} · {s.engine}: no samples collected.[/dim]")
+            continue
+        ours = s.our_share
+        console.print(
+            f"\n[bold]{s.query_id}[/bold] · {s.engine} "
+            f"({s.n_samples} samples)"
+        )
+        console.print(
+            f"  our share (`{our_domain}`): {ours.share * 100:.0f}% "
+            f"(Wilson {ours.ci_low * 100:.0f}–{ours.ci_high * 100:.0f}%)"
+        )
+        dominators = ", ".join(
+            f"{d.domain} {d.share * 100:.0f}%" for d in s.top_domains[:3]
+        )
+        if dominators:
+            console.print(f"  dominating: {dominators}")
+
+    console.print(
+        f"\n[dim]{result.n_samples} samples · ${result.total_cost_usd:.4f} · "
+        f"{result.n_failures} failures. A single run is noise — trends need "
+        f"3+ weekly runs with non-overlapping Wilson intervals (§6.6).[/dim]"
+    )
 
 
 # --- report ----------------------------------------------------------------

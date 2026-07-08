@@ -58,6 +58,8 @@ class TruthConfig(BaseModel):
     engines: list[Literal["perplexity", "gemini_grounded"]] = Field(
         default_factory=lambda: ["perplexity", "gemini_grounded"]
     )
+    perplexity_model: str = "sonar"
+    gemini_model: str = "gemini-2.5-flash"
 
 
 class BudgetConfig(BaseModel):
@@ -81,6 +83,9 @@ class Config(BaseModel):
     truth: TruthConfig = Field(default_factory=TruthConfig)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     pricing: dict[str, ModelPrice] = Field(default_factory=dict)
+    # Editable per-request USD estimate for tracker engines (§11) — these vary by
+    # token usage; treat as rough caps, verify against current provider pricing.
+    truth_pricing: dict[str, float] = Field(default_factory=dict)
 
     def config_hash(self) -> str:
         """Stable hash of the resolved config, recorded on every run (§5)."""

@@ -1,0 +1,24 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          { "text": "The S&P/ASX 200 tracks the 200 largest companies listed on the Australian Securities Exchange." }
+        ]
+      },
+      "finishReason": "STOP",
+      "groundingMetadata": {
+        "webSearchQueries": ["ASX 200", "what is the ASX 200"],
+        "groundingChunks": [
+          { "web": { "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AbC123", "title": "marketindex.com.au" } },
+          { "web": { "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/DeF456", "title": "fool.com.au" } },
+          { "web": { "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/GhI789", "title": "asx.com.au" } }
+        ],
+        "groundingSupports": [
+          { "segment": { "startIndex": 0, "endIndex": 90 }, "groundingChunkIndices": [0, 1] }
+        ]
+      }
+    }
+  ]
+}

@@ -33,10 +33,18 @@ tournament:
 truth:
   samples_per_engine: 10
   engines: [perplexity, gemini_grounded]
+  perplexity_model: sonar               # verify current sonar model names at build time
+  gemini_model: gemini-2.5-flash        # Google Search grounding model
 
 budget:
   max_usd_per_rank_run: 2.00        # hard stop; abort run if exceeded
   max_usd_per_track_run: 3.00
+
+# Rough per-request USD estimate per tracker engine, for the track-run budget cap.
+# Real cost varies with tokens/grounding — verify against current provider pricing.
+truth_pricing:
+  perplexity: 0.005
+  gemini_grounded: 0.002
 
 # Editable price table (USD per 1M tokens). API prices change — keep current.
 # Cost estimation reads from here; see §8/§11 of CITEWORTHY_SPEC.md.

@@ -27,3 +27,13 @@ def short_html() -> str:
 @pytest.fixture
 def serpapi_json() -> dict:
     return json.loads(load_fixture("serpapi_asx200.json"))
+
+
+@pytest.fixture
+def perplexity_json() -> dict:
+    return json.loads(load_fixture("perplexity_asx200.json"))
+
+
+@pytest.fixture
+def gemini_json() -> dict:
+    return json.loads(load_fixture("gemini_asx200.json"))
