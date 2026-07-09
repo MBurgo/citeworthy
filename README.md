@@ -36,6 +36,22 @@ citeworthy costs                         # token spend summary from logged calls
 `init`, `queries`, and `costs` are functional now; `rank`, `optimize`,
 `track run`, and `report` print which milestone implements them.
 
+## Web app (optional)
+
+A FastAPI dashboard + API layer wraps the same engine: manage queries, trigger
+rank/optimize/track jobs, and view reports in the browser. The heavy jobs run in
+a separate worker (Vercel serverless can't hold a multi-minute run), with Postgres
+shared between the two. `db.py` is dual-backend — the CLI/tests use SQLite, the
+web app uses Postgres via `CITEWORTHY_DATABASE_URL`.
+
+```bash
+uv pip install -e ".[web]"
+uv run uvicorn citeworthy.web.app:app --reload      # API + dashboard
+uv run python -m citeworthy.web.worker              # worker (separate terminal)
+```
+
+See [`WEB.md`](./WEB.md) for the architecture and Vercel/Neon deployment steps.
+
 ## Tests
 
 ```bash

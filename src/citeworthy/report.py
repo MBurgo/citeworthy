@@ -288,10 +288,11 @@ def write_report(query_id: str, markdown: str) -> Path:
     return path
 
 
-def render_query_report(
-    conn: sqlite3.Connection, query_id: str, *, our_domain: str = "fool.com.au"
-) -> tuple[str, Path]:
-    """Render and write the report for a query's most recent rank run (§6.7)."""
+def query_report_markdown(
+    conn, query_id: str, *, our_domain: str = "fool.com.au"
+) -> str:
+    """Build the report markdown for a query's most recent rank run, without
+    touching the filesystem (used by the web API — serverless FS is read-only)."""
     query = db.get_query(conn, query_id)
     if query is None:
         raise KeyError(f"no such query: {query_id}")
@@ -304,10 +305,17 @@ def render_query_report(
     passages = db.get_passages(conn, [r.passage_id for r in rank_results])
     citation_md = build_citation_share_md(conn, query_id, our_domain)
 
-    md = render_query_report_md(
+    return render_query_report_md(
         query, rank_results, passages, matchups, run_id=run_id,
         our_domain=our_domain, citation_md=citation_md,
     )
+
+
+def render_query_report(
+    conn, query_id: str, *, our_domain: str = "fool.com.au"
+) -> tuple[str, Path]:
+    """Render and write the report for a query's most recent rank run (§6.7)."""
+    md = query_report_markdown(conn, query_id, our_domain=our_domain)
     return md, write_report(query_id, md)
 
 

@@ -22,9 +22,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Web app (Vercel serverless API) + background worker + Postgres backend.
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "psycopg[binary]>=3.1",
+    "markdown>=3.6",
+]
 dev = [
     "pytest>=8.0",
     "hypothesis>=6.100",
+    "fastapi>=0.110",   # for the API tests (TestClient)
+    "markdown>=3.6",
 ]
 
 [project.scripts]

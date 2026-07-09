@@ -24,5 +24,8 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
+# Vercel
+.vercel/
+
 # OS
 .DS_Store

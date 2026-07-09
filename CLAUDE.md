@@ -29,3 +29,14 @@ truth/ (perplexity, gemini, share), tracker.py, and the `track run` command as o
 Milestone 5; editor/ (variants, compliance, loop) and the `optimize` command as
 of Milestone 6; portfolio.py, report.py's `--all` summary, and the judge-vs-reality
 correlation as of Milestone 7. All milestones in §14 are now built.
+
+## Web layer (post-spec)
+An optional web app wraps the engine — see WEB.md. `db.py` is dual-backend
+(SQLite for CLI/tests, Postgres for the web app/worker via CITEWORTHY_DATABASE_URL)
+through a thin `Store` proxy; all repository functions are written once. The
+FastAPI API (src/citeworthy/web/app.py, served via api/index.py on Vercel) does
+fast reads + enqueues jobs; the worker (src/citeworthy/web/worker.py) claims jobs
+from the `jobs` table and runs rank/optimize/track. Keep the two backends in sync:
+any schema change goes in SCHEMA_TEMPLATE (portable SQL only; `{autopk}` for the
+autoincrement PK), and avoid SQLite-only syntax like INSERT OR REPLACE (use
+ON CONFLICT ... DO UPDATE, which both backends support).
