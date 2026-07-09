@@ -26,6 +26,9 @@ JobKind = Literal["rank", "optimize", "track"]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from dotenv import load_dotenv
+
+    load_dotenv()  # local .env for CITEWORTHY_DATABASE_URL etc. (no-op if absent)
     app.state.config = load_config()
     store = db.connect()
     try:

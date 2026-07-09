@@ -36,6 +36,9 @@ def process_one(store: Store, config, runners: JobRunners) -> bool:
 
 
 def run_forever(poll_seconds: float = POLL_SECONDS) -> None:  # pragma: no cover - loop
+    from dotenv import load_dotenv
+
+    load_dotenv()  # pick up API keys from a local .env (no-op if absent)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config = load_config()
     runners = live_runners()
