@@ -20,12 +20,12 @@ Built per the milestone sequence in §14 of CITEWORTHY_SPEC.md.
 - [x] Milestone 4: `rank` end-to-end + report. **Human review checkpoint (awaiting a real run).**
 - [x] Milestone 5: Tracker (`truth/` + `track run` + share stats).
 - [x] Milestone 6: Edit loop + compliance gate.
-- [ ] Milestone 7: Portfolio report + judge-vs-reality correlation.
+- [x] Milestone 7: Portfolio report + judge-vs-reality correlation.
 
 serp/serpapi.py and extract.py are implemented as of Milestone 2; ranker/judge.py,
 tournament.py, and bradley_terry.py as of Milestone 3; pipeline.py, report.py,
 ranker/diagnose.py, and the `rank`/`report` CLI commands as of Milestone 4;
 truth/ (perplexity, gemini, share), tracker.py, and the `track run` command as of
 Milestone 5; editor/ (variants, compliance, loop) and the `optimize` command as
-of Milestone 6. Only report.py's `--all` portfolio summary + judge-vs-reality
-correlation remain (Milestone 7).
+of Milestone 6; portfolio.py, report.py's `--all` summary, and the judge-vs-reality
+correlation as of Milestone 7. All milestones in §14 are now built.

@@ -397,6 +397,84 @@ def write_optimize_report(query_id: str, markdown: str) -> Path:
     return path
 
 
-def render_portfolio_report() -> str:
-    """The `--all` portfolio summary (§6.7) — implemented in Milestone 7."""
-    raise NotImplementedError("Portfolio report lands with Milestone 7.")
+def _pct_or_dash(x: float | None) -> str:
+    return _pct(x) if x is not None else "—"
+
+
+def render_portfolio_report_md(rows, correlations, *, our_domain: str) -> str:
+    """Render the `report --all` portfolio summary + judge-vs-reality correlation
+    (§6.7, §12.1)."""
+    from .portfolio import WEAK_CORRELATION
+
+    ranked = [r for r in rows if r.our_rank is not None]
+    lines: list[str] = []
+    lines.append("# Citeworthy — Portfolio")
+    lines.append("")
+    lines.append(f"{len(rows)} queries · {len(ranked)} ranked · our domain `{our_domain}`")
+    lines.append("")
+
+    # Which engine columns to show (those with any data).
+    engines = [e for e in ("perplexity", "gemini_grounded")
+               if any(r.our_share.get(e) is not None for r in rows)]
+
+    lines.append("## Queries")
+    lines.append("")
+    lines.append("_Sorted by tier, then gap to leader (biggest opportunity first)._")
+    lines.append("")
+    header = "| Query | Tier | Our rank | Our prob | Leader | Gap |"
+    sep = "|-------|------|---------:|---------:|-------:|----:|"
+    for e in engines:
+        header += f" {e} share |"
+        sep += "----------:|"
+    lines.append(header)
+    lines.append(sep)
+    for r in rows:
+        rank = str(r.our_rank) if r.our_rank is not None else "—"
+        row = (f"| `{r.query_id}` | {r.tier} | {rank} | "
+               f"{_pct_or_dash(r.our_prob)} | {_pct_or_dash(r.leader_prob)} | "
+               f"{_pct_or_dash(r.gap)} |")
+        for e in engines:
+            row += f" {_pct_or_dash(r.our_share.get(e))} |"
+        lines.append(row)
+    lines.append("")
+
+    # Judge vs reality (§12.1).
+    lines.append("## Judge vs reality")
+    lines.append("")
+    lines.append("_Spearman rank correlation between the ranker's selection "
+                 "probability and observed citation share, across queries._")
+    lines.append("")
+    for c in correlations:
+        if c.insufficient:
+            lines.append(
+                f"- **{c.engine}:** insufficient data — need ≥3 tracked queries and "
+                f"≥4 weekly runs (have {c.n_queries} queries, min {c.min_runs} runs)."
+            )
+        elif c.rho is None:
+            lines.append(f"- **{c.engine}:** correlation undefined (no variance in the data).")
+        else:
+            verdict = (" ⚠️ weak — iterate the **judge prompt** (not the architecture) first"
+                       if abs(c.rho) < WEAK_CORRELATION else "")
+            lines.append(
+                f"- **{c.engine}:** ρ = {c.rho:+.2f} over {c.n_queries} queries "
+                f"(min {c.min_runs} runs).{verdict}"
+            )
+    lines.append("")
+    lines.append("---")
+    lines.append("*Portfolio view. Per-query detail: `citeworthy report <query_id>`.*")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_portfolio_report(
+    conn: sqlite3.Connection, config
+) -> tuple[str, Path]:
+    """Build and write the portfolio report (§6.7)."""
+    from .portfolio import build_portfolio
+
+    rows, correlations = build_portfolio(conn, config)
+    md = render_portfolio_report_md(rows, correlations, our_domain=config.our_domain)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = REPORTS_DIR / "portfolio.md"
+    path.write_text(md, encoding="utf-8")
+    return md, path

@@ -496,7 +496,15 @@ def report(
     from . import report as report_mod
 
     if all:
-        _not_yet("report --all", "Milestone 7")
+        conn = db.connect()
+        try:
+            md, path = report_mod.render_portfolio_report(conn, load_config())
+        finally:
+            conn.close()
+        console.print(f"[green]Portfolio report written:[/green] {path}")
+        if show:
+            console.print(md)
+        return
 
     if not query_id:
         console.print("[red]Provide a query id or --all.[/red]")
