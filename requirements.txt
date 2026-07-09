@@ -1,0 +1,12 @@
+# Dependencies for the Vercel serverless API function (api/index.py).
+# The API only reads the DB, renders reports, and enqueues jobs — it does NOT run
+# the ranker/editor/tracker (that's the worker), so the heavy ML/LLM deps
+# (trafilatura, choix, anthropic) are intentionally omitted to stay under Vercel's
+# function size limit. The worker installs the full package instead.
+fastapi>=0.110
+pydantic>=2.6
+pydantic-settings>=2.2
+pyyaml>=6.0
+markdown>=3.6
+numpy>=1.26
+psycopg[binary]>=3.1

@@ -1,0 +1,20 @@
+# Background worker for Citeworthy — runs the long rank/optimize/track jobs.
+# Deploy on a persistent host (Render / Fly / Cloud Run), NOT Vercel serverless.
+#
+#   docker build -f Dockerfile.worker -t citeworthy-worker .
+#   docker run --env-file .env citeworthy-worker
+#
+# Required env: CITEWORTHY_DATABASE_URL (same Postgres as the API), ANTHROPIC_API_KEY,
+# SERPAPI_API_KEY, and optionally PERPLEXITY_API_KEY / GEMINI_API_KEY.
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY pyproject.toml README.md ./
+COPY src ./src
+COPY config.yaml ./
+
+# Install the full package (worker needs trafilatura, choix, anthropic, etc.)
+# plus the Postgres driver.
+RUN pip install --no-cache-dir . "psycopg[binary]>=3.1"
+
+CMD ["python", "-m", "citeworthy.web.worker"]

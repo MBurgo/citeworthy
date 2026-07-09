@@ -1,0 +1,45 @@
+{
+  "search_metadata": {
+    "id": "fixture-asx200",
+    "status": "Success"
+  },
+  "search_parameters": {
+    "engine": "google",
+    "q": "ASX 200",
+    "google_domain": "google.com.au",
+    "gl": "au",
+    "hl": "en",
+    "location_requested": "Australia"
+  },
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "S&P/ASX 200 Index — Live Chart",
+      "link": "https://www.marketindex.com.au/asx200",
+      "snippet": "Live S&P/ASX 200 index price, chart and constituents."
+    },
+    {
+      "position": 2,
+      "title": "What is the ASX 200?",
+      "link": "https://www.commsec.com.au/education/asx-200.html",
+      "snippet": "The ASX 200 is Australia's benchmark share market index."
+    },
+    {
+      "position": 3,
+      "title": "ASX 200 constituents and weightings",
+      "link": "https://example-broker.com.au/asx-200-guide",
+      "snippet": "A guide to the companies in the ASX 200."
+    },
+    {
+      "position": 4,
+      "title": "Understanding the ASX 200 | The Motley Fool Australia",
+      "link": "https://www.fool.com.au/asx-200-explained/",
+      "snippet": "The ASX 200 explained for Australian investors."
+    }
+  ],
+  "related_questions": [
+    { "question": "What is the difference between the ASX 200 and All Ordinaries?" },
+    { "question": "How many companies are in the ASX 200?" },
+    { "question": "How is the ASX 200 calculated?" }
+  ]
+}

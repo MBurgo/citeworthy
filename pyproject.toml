@@ -1,0 +1,51 @@
+[project]
+name = "citeworthy"
+version = "0.1.0"
+description = "AI Citation Optimizer — measure and improve fool.com.au citation share in AI answer engines"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Matt Burgess", email = "matt.burgess@fool.com.au" }]
+dependencies = [
+    "typer>=0.12",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    # The following are used by later milestones (extraction, ranking, LLM calls).
+    # Declared now so the environment is ready; unused code paths are stubbed.
+    "trafilatura>=1.8",
+    "choix>=0.3.5",
+    "numpy>=1.26",
+    "anthropic>=0.39",
+]
+
+[project.optional-dependencies]
+# Web app (Vercel serverless API) + background worker + Postgres backend.
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "psycopg[binary]>=3.1",
+    "markdown>=3.6",
+]
+dev = [
+    "pytest>=8.0",
+    "hypothesis>=6.100",
+    "fastapi>=0.110",   # for the API tests (TestClient)
+    "markdown>=3.6",
+]
+
+[project.scripts]
+citeworthy = "citeworthy.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/citeworthy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

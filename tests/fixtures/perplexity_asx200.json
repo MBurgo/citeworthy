@@ -1,0 +1,26 @@
+{
+  "id": "fixture-ppx-asx200",
+  "model": "sonar",
+  "created": 1767225600,
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "The S&P/ASX 200 is Australia's benchmark index of the 200 largest companies listed on the ASX by float-adjusted market capitalisation."
+      }
+    }
+  ],
+  "citations": [
+    "https://www.marketindex.com.au/asx200",
+    "https://www.fool.com.au/asx-200-explained/",
+    "https://www.commsec.com.au/education/asx-200.html"
+  ],
+  "search_results": [
+    { "title": "S&P/ASX 200 Index", "url": "https://www.marketindex.com.au/asx200", "date": "2026-01-02" },
+    { "title": "Understanding the ASX 200", "url": "https://www.fool.com.au/asx-200-explained/", "date": "2026-02-01" },
+    { "title": "What is the ASX 200?", "url": "https://www.commsec.com.au/education/asx-200.html", "date": "2025-11-15" }
+  ],
+  "usage": { "prompt_tokens": 20, "completion_tokens": 40, "total_tokens": 60 }
+}
